@@ -47,8 +47,17 @@ Once installed, **Slipstream** appears directly in **Game Vibes** in your applic
 
 ## Unique Gameplay Mechanics
 
-- **Speed Orbs & Velocity Surges**:
-  Collect glowing golden Speed Orbs floating along the highway lanes between traffic. Each orb gives an immediate instant acceleration surge (+25 km/h), extends the **Speed Surge** buff, recharges +20% Kinetic Boost energy, and awards +350 bonus points multiplied by your combo!
+- **🚀 Stunt Launch Ramps**:
+  Hit neon wedge launch ramps placed along the lanes to catapult high into the air over traffic. Perform mid-air 360 barrel rolls and slam down with a kinetic ground-pound shockwave that blasts nearby traffic off the road for **AIR STUNT** score bonuses!
+- **⚡ Tactical Cyber Powerups**:
+  - **Speed Surge (Gold Octahedron)**: +25 km/h instant velocity boost, +20% Overdrive energy, and combo score bonus.
+  - **Kinetic Shield (Cyan Icosahedron)**: Envelops your supercar in a rotating polygonal plasma bubble that absorbs a crash and obliterates the vehicle you strike.
+  - **Shard Magnet (Green Torus)**: Generates a high-power magnetic vortex pulling all orbs and powerups across all lanes straight into your car.
+  - **EMP Shockwave (Magenta Dodecahedron)**: Discharges a massive electromagnetic blast wave forward across the highway, vaporizing all traffic in your path.
+- **🌀 Rollercoaster Highway Curvature**:
+  The multi-lane neon highway undulates with sweeping curves, hill crests, and dips as you race through the cyber metropolis, with your car dynamically banking into each turn.
+- **🎵 Procedural Synthwave Soundtrack Engine**:
+  A dynamic, synthesized 16th-note retro 80s bassline, driving arpeggios, and rhythmic beats generated in real time with the Web Audio API—accelerating and opening its lowpass filter when Overdrive is engaged!
 - **Aerodynamic Slipstream Drafting**:
   Tuck in right behind opponent vehicles within their drafting cone. You'll hear the aerodynamic whistle, pick up an immediate velocity surge, and recharge your **Kinetic Boost** gauge.
 - **Near Miss Combos**:

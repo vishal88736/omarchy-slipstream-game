@@ -74,6 +74,11 @@
   <div id="combo-badge">COMBO x2</div>
 </div>
 
+<div id="powerups-hud" style="position:fixed; bottom:20px; left:20px; display:flex; gap:10px; pointer-events:none; z-index:10;">
+  <div id="badge-shield" class="hud-panel" style="display:none; color:var(--cyan); font-size:12px; font-weight:800; letter-spacing:1px; border:1px solid var(--cyan);">🛡️ SHIELD ACTIVE</div>
+  <div id="badge-magnet" class="hud-panel" style="display:none; color:var(--green); font-size:12px; font-weight:800; letter-spacing:1px; border:1px solid var(--green);">🧲 MAGNET ACTIVE</div>
+</div>
+
 <div id="title" class="screen show"><div>
   <h1>SLIPSTREAM</h1>
   <p style="font-size:19px; color:var(--cyan); font-weight:700; letter-spacing:2px;">KINETIC OVERDRIVE RACER</p>
@@ -96,6 +101,7 @@
     <div class="stat-card"><div class="label">Distance</div><div class="val" id="stat-dist">0 m</div></div>
     <div class="stat-card"><div class="label">Top Speed</div><div class="val" id="stat-speed">0 km/h</div></div>
     <div class="stat-card"><div class="label">Speed Orbs</div><div class="val" id="stat-orbs">0</div></div>
+    <div class="stat-card"><div class="label">Air Stunts</div><div class="val" id="stat-stunts">0</div></div>
     <div class="stat-card"><div class="label">Near Misses</div><div class="val" id="stat-misses">0</div></div>
     <div class="stat-card"><div class="label">Takedowns</div><div class="val" id="stat-takedowns">0</div></div>
   </div>
@@ -115,11 +121,13 @@
     <tr><td class="key">M</td><td>Sound mute toggle</td></tr>
     <tr><td class="key">?</td><td>This manual</td></tr>
   </table>
-  <div style="text-align: left; background: color-mix(in srgb, var(--foreground) 8%, transparent); padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; margin-top: 10px;">
-    <b style="color:var(--yellow)">SPEED ORBS:</b> Collect glowing energy orbs along the lanes for instant speed surges, boost energy, and bonus score!<br>
-    <b style="color:var(--cyan)">SLIPSTREAM DRAFT:</b> Sit tight behind rival cars to catch their air draft, gain speed, and recharge your boost gauge rapidly!<br>
-    <b style="color:var(--orange)">NEAR MISS:</b> Skim close past traffic at high speed to build huge combo multipliers.<br>
-    <b style="color:var(--magenta)">OVERDRIVE TAKEDOWN:</b> While boosting, you are invincible. Ram opponents off the road for massive bonus points!
+  <div style="text-align: left; background: color-mix(in srgb, var(--foreground) 8%, transparent); padding: 12px; border-radius: 8px; font-size: 13.5px; line-height: 1.5; margin-top: 10px;">
+    <b style="color:var(--yellow)">⚡ SPEED ORBS:</b> Instant speed surges, boost energy, and combo score!<br>
+    <b style="color:var(--cyan)">🛡️ KINETIC SHIELD:</b> Energy bubble that absorbs a crash and obliterates the rival!<br>
+    <b style="color:var(--green)">🧲 SHARD MAGNET:</b> Vacuum pulls all orbs and pickups across all lanes to you!<br>
+    <b style="color:var(--magenta)">💥 EMP SHOCKWAVE:</b> Electromagnetic blast vaporizes traffic ahead!<br>
+    <b style="color:var(--orange)">🚀 LAUNCH RAMPS:</b> Launch high into the air over traffic for 360 stunts and shockwave landings!<br>
+    <b style="color:var(--cyan)">SLIPSTREAM DRAFT:</b> Tuck tight behind rivals for draft speed and boost recharge!
   </div>
   <p class="dim" style="margin-top:14px;">Press any key to close</p>
 </div></div>
@@ -348,6 +356,94 @@ function noise(seconds = 0.15, volume = 0.2, tone = 2000) {
   } catch {}
 }
 
+// Procedural Synthwave Music Engine
+let _musicStep = 0, _nextNoteTime = 0;
+const BASS_PITCHES = [
+  73.42, 73.42, 146.83, 73.42, 73.42, 73.42, 146.83, 73.42,
+  73.42, 73.42, 146.83, 73.42, 73.42, 73.42, 110.0, 130.81,
+  58.27, 58.27, 116.54, 58.27, 58.27, 58.27, 116.54, 58.27,
+  58.27, 58.27, 116.54, 58.27, 58.27, 58.27, 87.31, 103.83,
+  65.41, 65.41, 130.81, 65.41, 65.41, 65.41, 130.81, 65.41,
+  65.41, 65.41, 130.81, 65.41, 65.41, 65.41, 98.00, 116.54,
+  55.00, 55.00, 110.00, 55.00, 55.00, 55.00, 110.00, 55.00,
+  55.00, 55.00, 110.00, 55.00, 55.00, 65.41, 73.42, 82.41,
+];
+const LEAD_PITCHES = [
+  293.66, 0, 349.23, 0, 440.00, 0, 523.25, 587.33,
+  0, 523.25, 0, 440.00, 0, 349.23, 392.00, 440.00,
+  233.08, 0, 293.66, 0, 349.23, 0, 466.16, 523.25,
+  0, 466.16, 0, 349.23, 0, 293.66, 349.23, 392.00,
+  261.63, 0, 329.63, 0, 392.00, 0, 523.25, 587.33,
+  0, 523.25, 0, 392.00, 0, 329.63, 349.23, 392.00,
+  220.00, 0, 261.63, 0, 329.63, 0, 440.00, 493.88,
+  0, 440.00, 0, 329.63, 0, 261.63, 293.66, 329.63,
+];
+
+function updateMusic() {
+  if (_muted || !_audio || _audio.state !== 'running' || state !== 'playing') return;
+  const bpm = isBoosting ? 142 : 124;
+  const stepDuration = 60 / bpm / 4;
+  const now = _audio.currentTime;
+
+  if (_nextNoteTime < now) _nextNoteTime = now;
+  while (_nextNoteTime < now + 0.1) {
+    const bassFreq = BASS_PITCHES[_musicStep % BASS_PITCHES.length];
+    const leadFreq = LEAD_PITCHES[_musicStep % LEAD_PITCHES.length];
+
+    if (bassFreq > 0) {
+      const bOsc = _audio.createOscillator(), bGain = _audio.createGain(), bFilter = _audio.createBiquadFilter();
+      bOsc.type = 'sawtooth';
+      bOsc.frequency.setValueAtTime(bassFreq, _nextNoteTime);
+      bFilter.type = 'lowpass';
+      bFilter.frequency.setValueAtTime(isBoosting ? 650 : 380, _nextNoteTime);
+      bFilter.frequency.exponentialRampToValueAtTime(120, _nextNoteTime + stepDuration * 0.9);
+      bGain.gain.setValueAtTime(0.045, _nextNoteTime);
+      bGain.gain.exponentialRampToValueAtTime(0.0001, _nextNoteTime + stepDuration * 0.85);
+      bOsc.connect(bFilter).connect(bGain).connect(_audio.destination);
+      bOsc.start(_nextNoteTime);
+      bOsc.stop(_nextNoteTime + stepDuration);
+    }
+
+    if (leadFreq > 0) {
+      const lOsc = _audio.createOscillator(), lGain = _audio.createGain();
+      lOsc.type = 'triangle';
+      lOsc.frequency.setValueAtTime(leadFreq, _nextNoteTime);
+      lGain.gain.setValueAtTime(0.035, _nextNoteTime);
+      lGain.gain.exponentialRampToValueAtTime(0.0001, _nextNoteTime + stepDuration * 1.8);
+      lOsc.connect(lGain).connect(_audio.destination);
+      lOsc.start(_nextNoteTime);
+      lOsc.stop(_nextNoteTime + stepDuration * 2);
+    }
+
+    if (_musicStep % 4 === 0) {
+      const kOsc = _audio.createOscillator(), kGain = _audio.createGain();
+      kOsc.type = 'sine';
+      kOsc.frequency.setValueAtTime(140, _nextNoteTime);
+      kOsc.frequency.exponentialRampToValueAtTime(35, _nextNoteTime + 0.08);
+      kGain.gain.setValueAtTime(0.06, _nextNoteTime);
+      kGain.gain.exponentialRampToValueAtTime(0.001, _nextNoteTime + 0.08);
+      kOsc.connect(kGain).connect(_audio.destination);
+      kOsc.start(_nextNoteTime);
+      kOsc.stop(_nextNoteTime + 0.08);
+    } else if (_musicStep % 4 === 2) {
+      const t = _nextNoteTime, buf = _audio.createBuffer(1, Math.ceil(_audio.sampleRate * 0.04), _audio.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const s = _audio.createBufferSource(), f = _audio.createBiquadFilter(), g = _audio.createGain();
+      s.buffer = buf;
+      f.type = 'highpass';
+      f.frequency.value = 4000;
+      g.gain.setValueAtTime(0.025, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      s.connect(f).connect(g).connect(_audio.destination);
+      s.start(t);
+    }
+
+    _musicStep++;
+    _nextNoteTime += stepDuration;
+  }
+}
+
 const $ = id => document.getElementById(id);
 let state = 'title', score = 0, best = saved.get('best', null), shake = 0;
 let _helpFrom = 'title';
@@ -361,7 +457,17 @@ const TRACK_SEGMENT_LENGTH = 12;
 const NUM_TRACK_SEGMENTS = 36;
 const MAX_TRAFFIC = 14;
 
-let playerCar, playerWheels = [];
+// Rollercoaster Curvature Functions
+function getRoadCurveX(z) {
+  const s = z - distanceTraveled;
+  return Math.sin(s * 0.013) * 6.2 + Math.sin(s * 0.027) * 2.8;
+}
+function getRoadCurveY(z) {
+  const s = z - distanceTraveled;
+  return Math.sin(s * 0.018) * 1.5;
+}
+
+let playerCar, playerWheels = [], playerShieldMesh = null;
 let roadSegments = [];
 let traffic = [];
 let particles = [];
@@ -369,13 +475,27 @@ let draftLines = [];
 let buildings = [];
 let arches = [];
 
+// Stunt Ramps
+let ramps = [];
+let isAirborne = false;
+let airY = 0;
+let airVy = 0;
+let airRoll = 0;
+let stuntsCount = 0;
+
+// Powerups
+let hasShield = false;
+let magnetTimer = 0;
+let empBlastRing = null;
+let empBlastTimer = 0;
+
 // Game state variables
-let playerSpeed = 0;         // in world units per second (~50-130)
+let playerSpeed = 0;
 let targetSpeed = 0;
 let playerX = 0;
 let playerSteer = 0;
 let playerRoll = 0;
-let boostEnergy = 40;        // 0 to 100
+let boostEnergy = 40;
 let boostBurst = 0;
 let isBoosting = false;
 let isDrafting = false;
@@ -397,23 +517,37 @@ let collectibles = [];
 let speedSurgeTimer = 0;
 let speedOrbsCollected = 0;
 
-// Speed orb shared geometries & materials
-const orbGeom = new THREE.OctahedronGeometry(0.55, 0);
+// Shared powerup geometries & materials
+const POWERUP_COLORS = {
+  speed: PALETTE.yellow,
+  shield: PALETTE.cyan,
+  magnet: PALETTE.green,
+  emp: PALETTE.magenta,
+};
+const powerupMaterials = {};
+for (const [type, color] of Object.entries(POWERUP_COLORS)) {
+  powerupMaterials[type] = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.9,
+    roughness: 0.2,
+    metalness: 0.8,
+  });
+}
 const ringGeom = new THREE.TorusGeometry(0.72, 0.06, 8, 16);
-const orbMat = new THREE.MeshStandardMaterial({
-  color: PALETTE.yellow,
-  emissive: PALETTE.yellow,
-  emissiveIntensity: 0.9,
-  roughness: 0.2,
-  metalness: 0.8,
-});
 const ringMat = new THREE.MeshBasicMaterial({ color: PALETTE.cyan });
 const orbShadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.35 });
 const orbShadowGeom = new THREE.PlaneGeometry(1.2, 1.2);
 
-function createOrbMesh() {
+function createPowerupMesh(type = 'speed') {
   const group = new THREE.Group();
-  const core = new THREE.Mesh(orbGeom, orbMat);
+  let geom;
+  if (type === 'shield') geom = new THREE.IcosahedronGeometry(0.55, 0);
+  else if (type === 'magnet') geom = new THREE.TorusGeometry(0.55, 0.16, 8, 16);
+  else if (type === 'emp') geom = new THREE.DodecahedronGeometry(0.55, 0);
+  else geom = new THREE.OctahedronGeometry(0.55, 0);
+
+  const core = new THREE.Mesh(geom, powerupMaterials[type]);
   core.castShadow = true;
   const ring = new THREE.Mesh(ringGeom, ringMat);
   ring.rotation.x = Math.PI / 2;
@@ -421,20 +555,74 @@ function createOrbMesh() {
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = -0.78;
   group.add(core, ring, shadow);
-  group.userData = { core, ring, shadow };
+  group.userData = { core, ring, shadow, type };
   return group;
 }
 
 function spawnOrbCluster(zOffset = null) {
   const lane = LANES[Math.floor(random() * LANES.length)];
-  const count = 1 + Math.floor(random() * 4);
+  const r = random();
+  let pType = 'speed';
+  if (r < 0.42) pType = 'speed';
+  else if (r < 0.65) pType = 'shield';
+  else if (r < 0.82) pType = 'magnet';
+  else pType = 'emp';
+
+  const count = pType === 'speed' ? 1 + Math.floor(random() * 4) : 1;
   const baseZ = zOffset ?? (-160 - random() * 40);
   for (let i = 0; i < count; i++) {
-    const mesh = createOrbMesh();
+    const mesh = createPowerupMesh(pType);
     mesh.position.set(lane, 0.85, baseZ - i * 7.5);
     scene.add(mesh);
-    collectibles.push({ mesh, lane, baseZ: mesh.position.z, collected: false });
+    collectibles.push({ mesh, lane, type: pType, baseZ: mesh.position.z, collected: false });
   }
+}
+
+function createRampMesh() {
+  const group = new THREE.Group();
+  const geom = new THREE.BufferGeometry();
+  const w = 1.9, h = 1.25, d = 2.4;
+  const vertices = new Float32Array([
+    -w, 0, -d,   w, 0, -d,   w, h, d,
+    -w, 0, -d,   w, h, d,   -w, h, d,
+    -w, 0, -d,   w, 0, d,    w, 0, -d,
+    -w, 0, -d,  -w, 0, d,    w, 0, d,
+    -w, 0, d,    w, 0, d,    w, h, d,
+    -w, 0, d,    w, h, d,   -w, h, d,
+    -w, 0, -d,  -w, 0, d,   -w, h, d,
+     w, 0, -d,   w, h, d,    w, 0, d
+  ]);
+  geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  geom.computeVertexNormals();
+
+  const rampMat = new THREE.MeshStandardMaterial({
+    color: PALETTE.yellow,
+    roughness: 0.3,
+    metalness: 0.6,
+    emissive: PALETTE.yellow,
+    emissiveIntensity: 0.25,
+  });
+  const rampMesh = new THREE.Mesh(geom, rampMat);
+  rampMesh.castShadow = true;
+  group.add(rampMesh);
+
+  const arrowMat = new THREE.MeshBasicMaterial({ color: PALETTE.cyan });
+  for (let i = -1; i <= 1; i++) {
+    const arrow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.32), arrowMat);
+    arrow.rotation.x = -Math.atan2(h, d * 2) - Math.PI / 2;
+    arrow.position.set(0, h * 0.5 + i * 0.35, i * 1.1);
+    group.add(arrow);
+  }
+  return group;
+}
+
+function spawnRamp(zOffset = null) {
+  const lane = LANES[Math.floor(random() * LANES.length)];
+  const mesh = createRampMesh();
+  const zPos = zOffset ?? (-180 - random() * 60);
+  mesh.position.set(lane, 0, zPos);
+  scene.add(mesh);
+  ramps.push({ mesh, lane, baseZ: zPos });
 }
 
 function createCarMesh({ color = PALETTE.accent, isPlayer = false, type = 'sport' } = {}) {
@@ -687,7 +875,24 @@ function build() {
   // Player Car
   playerCar = createCarMesh({ color: PALETTE.accent, isPlayer: true, type: 'sport' });
   playerWheels = playerCar.userData.wheels;
+
+  // Kinetic Shield Bubble around player car
+  const shieldGeom = new THREE.IcosahedronGeometry(2.35, 1);
+  const shieldMat = new THREE.MeshBasicMaterial({ color: PALETTE.cyan, wireframe: true, transparent: true, opacity: 0.75 });
+  playerShieldMesh = new THREE.Mesh(shieldGeom, shieldMat);
+  playerShieldMesh.position.set(0, 0.7, 0);
+  playerShieldMesh.visible = false;
+  playerCar.add(playerShieldMesh);
+
   scene.add(playerCar);
+
+  // EMP Blast Expanding Ring
+  const empGeom = new THREE.RingGeometry(0.5, 4.0, 32);
+  const empMat = new THREE.MeshBasicMaterial({ color: PALETTE.magenta, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+  empBlastRing = new THREE.Mesh(empGeom, empMat);
+  empBlastRing.rotation.x = -Math.PI / 2;
+  empBlastRing.visible = false;
+  scene.add(empBlastRing);
 
   // Slipstream draft lines
   const draftMat = new THREE.LineBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.75, linewidth: 2 });
@@ -758,6 +963,23 @@ function reset() {
   speedSurgeTimer = 0;
   speedOrbsCollected = 0;
 
+  // Clear ramps
+  for (const r of ramps) scene.remove(r.mesh);
+  ramps = [];
+  isAirborne = false;
+  airY = 0;
+  airVy = 0;
+  airRoll = 0;
+  stuntsCount = 0;
+
+  hasShield = false;
+  if (playerShieldMesh) playerShieldMesh.visible = false;
+  magnetTimer = 0;
+  empBlastTimer = 0;
+  if (empBlastRing) empBlastRing.visible = false;
+  $('badge-shield').style.display = 'none';
+  $('badge-magnet').style.display = 'none';
+
   playerSpeed = 65;
   targetSpeed = 65;
   playerX = 0;
@@ -788,6 +1010,9 @@ function reset() {
   for (let i = 0; i < 4; i++) {
     spawnOrbCluster(-35 - i * 42);
   }
+  for (let i = 0; i < 2; i++) {
+    spawnRamp(-75 - i * 85);
+  }
 
   $('combo-badge').classList.remove('show');
   $('alert-banner').classList.remove('show');
@@ -816,13 +1041,14 @@ function spawnTrafficVehicle(zOffset = null) {
   if (selectedType === 'truck') speed = 32 + random() * 12;
   if (selectedType === 'police') speed = 52 + random() * 15;
 
-  mesh.position.set(lane, 0, spawnZ);
+  mesh.position.set(lane + getRoadCurveX(spawnZ), getRoadCurveY(spawnZ), spawnZ);
   scene.add(mesh);
 
   traffic.push({
     mesh,
     lane,
     targetLane: lane,
+    currentLaneX: lane,
     speed,
     type: selectedType,
     nearMissed: false,
@@ -904,18 +1130,68 @@ function update(dt) {
   playerCar.rotation.y = playerSteer;
   playerCar.rotation.z = playerRoll;
 
-  // Turn front wheels
-  for (const w of playerWheels) {
-    if (w.isFront) w.group.rotation.y = effectiveSteer * 0.45;
-    w.tire.rotation.x += playerSpeed * dt * 0.8;
-  }
-
-  // Highway scrolling effect: segments move toward +Z relative to player speed
+  // Highway scrolling effect & dynamic curve application
   for (const seg of roadSegments) {
     seg.position.z += playerSpeed * dt;
     if (seg.position.z > 28) {
       seg.position.z -= NUM_TRACK_SEGMENTS * TRACK_SEGMENT_LENGTH;
     }
+    seg.position.x = getRoadCurveX(seg.position.z);
+    seg.position.y = getRoadCurveY(seg.position.z);
+    seg.rotation.z = Math.cos((seg.position.z - distanceTraveled) * 0.013) * -0.06;
+  }
+
+  // Airborne stunt physics
+  if (isAirborne) {
+    airVy -= 34 * dt;
+    airY += airVy * dt;
+    airRoll += dt * 7.5;
+    playerCar.rotation.x = -airVy * 0.025;
+    playerCar.rotation.z = playerRoll + Math.sin(airRoll) * 0.65;
+
+    if (airY <= 0) {
+      airY = 0;
+      isAirborne = false;
+      playerCar.rotation.x = 0;
+      stuntsCount++;
+      const pts = 750 * combo;
+      score += pts;
+      shake = 0.4;
+      noise(0.25, 0.35, 400);
+      sound(180, 0.2, 'sawtooth', 60, 0.25);
+      triggerAlert(`AIR STUNT! +${pts}`, PALETTE.cyan);
+
+      // Shockwave knocks traffic away
+      for (const t of traffic) {
+        if (Math.abs(t.mesh.position.z - playerCar.position.z) < 6.5) {
+          t.takedown = true;
+          t.spinVelocity.set((t.mesh.position.x - playerCar.position.x) * 12 + (random() - 0.5) * 8, 15, -18);
+        }
+      }
+
+      for (let k = 0; k < 20; k++) {
+        spawnParticle(
+          playerCar.position.x, 0.3, playerCar.position.z,
+          (random() - 0.5) * 16, 2 + random() * 6, (random() - 0.5) * 16,
+          PALETTE.cyan, 0.4, 'spark'
+        );
+      }
+    }
+  }
+
+  const currentCurveX = getRoadCurveX(playerCar.position.z);
+  const currentCurveY = getRoadCurveY(playerCar.position.z);
+  playerCar.position.x = playerX + currentCurveX;
+  playerCar.position.y = (isAirborne ? airY : 0) + currentCurveY;
+  playerCar.rotation.y = playerSteer;
+  if (!isAirborne) {
+    playerCar.rotation.z = playerRoll + Math.cos((playerCar.position.z - distanceTraveled) * 0.013) * -0.07;
+  }
+
+  // Turn front wheels
+  for (const w of playerWheels) {
+    if (w.isFront) w.group.rotation.y = effectiveSteer * 0.45;
+    w.tire.rotation.x += playerSpeed * dt * 0.8;
   }
 
   // Background buildings & arches scrolling
@@ -926,6 +1202,8 @@ function update(dt) {
   for (const arch of arches) {
     arch.position.z += playerSpeed * dt;
     if (arch.position.z > 25) arch.position.z -= 480;
+    arch.position.x = getRoadCurveX(arch.position.z);
+    arch.position.y = getRoadCurveY(arch.position.z);
   }
 
   // Traffic updates
@@ -936,12 +1214,11 @@ function update(dt) {
     const t = traffic[i];
     
     if (t.takedown) {
-      // Vehicle is flying off in takedown state
       t.mesh.position.addScaledVector(t.spinVelocity, dt);
       t.mesh.rotation.x += dt * 8;
       t.mesh.rotation.y += dt * 6;
       t.mesh.rotation.z += dt * 4;
-      t.spinVelocity.y -= 35 * dt; // gravity
+      t.spinVelocity.y -= 35 * dt;
 
       if (t.mesh.position.y < -15 || t.mesh.position.z > 30) {
         scene.remove(t.mesh);
@@ -951,11 +1228,9 @@ function update(dt) {
       continue;
     }
 
-    // Relative movement along road
     const relativeSpeed = playerSpeed - t.speed;
     t.mesh.position.z += relativeSpeed * dt;
 
-    // AI lane changing occasionally
     t.switchCooldown -= dt;
     if (t.switchCooldown <= 0) {
       t.switchCooldown = 4 + random() * 5;
@@ -966,14 +1241,14 @@ function update(dt) {
         t.targetLane = LANES[newIdx];
       }
     }
-    t.mesh.position.x = THREE.MathUtils.damp(t.mesh.position.x, t.targetLane, 2.5, dt);
+    t.currentLaneX = THREE.MathUtils.damp(t.currentLaneX, t.targetLane, 2.5, dt);
+    t.mesh.position.x = t.currentLaneX + getRoadCurveX(t.mesh.position.z);
+    t.mesh.position.y = getRoadCurveY(t.mesh.position.z);
 
-    // Rotate traffic wheels
     for (const w of t.mesh.userData.wheels ?? []) {
       w.tire.rotation.x += t.speed * dt * 0.8;
     }
 
-    // Police flashing lights
     if (t.type === 'police' && t.mesh.userData.sirenL) {
       const flash = (Date.now() % 300) > 150;
       t.mesh.userData.sirenL.visible = flash;
@@ -983,21 +1258,20 @@ function update(dt) {
     const dx = Math.abs(playerCar.position.x - t.mesh.position.x);
     const dz = t.mesh.position.z - playerCar.position.z;
 
-    // 1. Slipstream Draft Detection (directly behind within 16 units)
-    if (dz < -2.2 && dz > -18 && dx < 1.6) {
+    // Slipstream Draft Detection
+    if (dz < -2.2 && dz > -18 && dx < 1.6 && (!isAirborne || airY < 1.4)) {
       currentDrafting = true;
       draftedVehicle = t;
       boostEnergy = Math.min(100, boostEnergy + dt * 28);
       score += Math.round(dt * 120);
 
-      // Spawn draft particles
       if (random() < 0.4) {
-        spawnParticle(t.mesh.position.x + (random() - 0.5) * 1.5, 0.4, t.mesh.position.z + 1.8, 0, 0, 15, PALETTE.cyan, 0.25, 'draft');
+        spawnParticle(t.mesh.position.x + (random() - 0.5) * 1.5, 0.4 + currentCurveY, t.mesh.position.z + 1.8, 0, 0, 15, PALETTE.cyan, 0.25, 'draft');
       }
     }
 
-    // 2. Near Miss Detection (swerving very close past traffic)
-    if (!t.nearMissed && Math.abs(dz) < 2.2 && dx >= 1.4 && dx < 2.5) {
+    // Near Miss Detection
+    if (!t.nearMissed && Math.abs(dz) < 2.2 && dx >= 1.4 && dx < 2.5 && (!isAirborne || airY < 1.4)) {
       t.nearMissed = true;
       nearMissCount++;
       combo = Math.min(8, combo + 1);
@@ -1009,10 +1283,23 @@ function update(dt) {
       showCombo(`COMBO x${combo}`);
     }
 
-    // 3. Collision / Crash / Takedown
-    if (Math.abs(dz) < 3.2 && dx < 1.7) {
-      if (isBoosting) {
-        // OVERDRIVE TAKEDOWN! Player smashes through rival
+    // Collision / Takedown / Wipeout
+    if (Math.abs(dz) < 3.2 && dx < 1.7 && (!isAirborne || airY < 1.4)) {
+      if (hasShield) {
+        hasShield = false;
+        $('badge-shield').style.display = 'none';
+        t.takedown = true;
+        takedownCount++;
+        score += 1000 * combo;
+        t.spinVelocity.set((t.mesh.position.x - playerCar.position.x) * 14 + (random() - 0.5) * 8, 16, -22);
+        shake = 0.35;
+        sound(260, 0.3, 'sawtooth', 70, 0.3);
+        noise(0.35, 0.3, 600);
+        triggerAlert('SHIELD TAKEDOWN! +1000', PALETTE.cyan);
+        for (let k = 0; k < 20; k++) {
+          spawnParticle(playerCar.position.x, 1.0, playerCar.position.z, (random() - 0.5) * 20, 6 + random() * 12, (random() - 0.5) * 20, PALETTE.cyan, 0.5, 'spark');
+        }
+      } else if (isBoosting) {
         t.takedown = true;
         takedownCount++;
         const pts = 1200 * combo;
@@ -1023,7 +1310,6 @@ function update(dt) {
         sound(180, 0.35, 'sawtooth', 60, 0.3);
         triggerAlert(`TAKEDOWN! +${pts}`, PALETTE.magenta);
 
-        // Shower of explosion sparks
         for (let k = 0; k < 18; k++) {
           spawnParticle(
             t.mesh.position.x, 1.0, t.mesh.position.z,
@@ -1033,7 +1319,6 @@ function update(dt) {
           );
         }
       } else {
-        // PLAYER WIPED OUT
         shake = 0.7;
         noise(0.6, 0.4, 500);
         sound(120, 0.5, 'sawtooth', 30, 0.35);
@@ -1053,7 +1338,6 @@ function update(dt) {
       }
     }
 
-    // Respawn traffic that went far behind or ahead
     if (t.mesh.position.z > 35 || t.mesh.position.z < -240) {
       scene.remove(t.mesh);
       traffic.splice(i, 1);
@@ -1063,34 +1347,92 @@ function update(dt) {
 
   isDrafting = currentDrafting;
 
-  // Collectibles (Speed Orbs / Points) update
+  // Powerups & Collectibles update
+  if (magnetTimer > 0) {
+    magnetTimer = Math.max(0, magnetTimer - dt);
+    $('badge-magnet').style.display = 'block';
+  } else {
+    $('badge-magnet').style.display = 'none';
+  }
+
+  $('badge-shield').style.display = hasShield ? 'block' : 'none';
+  if (playerShieldMesh) {
+    playerShieldMesh.visible = hasShield;
+    if (hasShield) {
+      playerShieldMesh.rotation.y += dt * 3.5;
+      playerShieldMesh.rotation.x += dt * 2.2;
+    }
+  }
+
   for (let i = collectibles.length - 1; i >= 0; i--) {
     const c = collectibles[i];
+
+    if (magnetTimer > 0) {
+      const dz = c.mesh.position.z - playerCar.position.z;
+      if (dz < 2 && dz > -38) {
+        c.lane = THREE.MathUtils.damp(c.lane, playerX, 9, dt);
+      }
+    }
+
     c.mesh.position.z += playerSpeed * dt;
+    c.mesh.position.x = c.lane + getRoadCurveX(c.mesh.position.z);
+    c.mesh.position.y = 0.85 + getRoadCurveY(c.mesh.position.z) + Math.sin(distanceTraveled * 0.15 + c.baseZ) * 0.15;
     c.mesh.userData.core.rotation.y += dt * 3.5;
     c.mesh.userData.core.rotation.x += dt * 2.0;
     c.mesh.userData.ring.rotation.z += dt * 4.0;
-    c.mesh.position.y = 0.85 + Math.sin(distanceTraveled * 0.15 + c.baseZ) * 0.15;
 
     const dx = Math.abs(playerCar.position.x - c.mesh.position.x);
     const dz = Math.abs(playerCar.position.z - c.mesh.position.z);
 
-    if (!c.collected && dx < 1.7 && dz < 1.8) {
+    if (!c.collected && dx < 1.8 && dz < 2.0) {
       c.collected = true;
       speedOrbsCollected++;
-      speedSurgeTimer = Math.min(6.0, speedSurgeTimer + 2.5);
-      playerSpeed = Math.min(145, playerSpeed + 14);
-      boostEnergy = Math.min(100, boostEnergy + 20);
-      const pts = 350 * combo;
-      score += pts;
-      sound(660, 0.12, 'sine', 1320, 0.22);
-      triggerAlert(`+${pts} SPEED SURGE!`, PALETTE.yellow);
 
-      for (let k = 0; k < 14; k++) {
+      if (c.type === 'shield') {
+        hasShield = true;
+        sound(440, 0.25, 'triangle', 880, 0.25);
+        triggerAlert('KINETIC SHIELD!', PALETTE.cyan);
+      } else if (c.type === 'magnet') {
+        magnetTimer = 7.0;
+        sound(500, 0.25, 'sine', 1000, 0.25);
+        triggerAlert('SHARD MAGNET!', PALETTE.green);
+      } else if (c.type === 'emp') {
+        empBlastRing.position.set(playerCar.position.x, 0.3 + currentCurveY, playerCar.position.z);
+        empBlastRing.scale.set(1, 1, 1);
+        empBlastRing.visible = true;
+        empBlastTimer = 0.5;
+        sound(140, 0.45, 'sawtooth', 35, 0.35);
+        noise(0.4, 0.3, 300);
+        shake = 0.5;
+
+        let empHits = 0;
+        for (const t of traffic) {
+          const tdz = t.mesh.position.z - playerCar.position.z;
+          if (tdz < 0 && tdz > -55 && !t.takedown) {
+            t.takedown = true;
+            takedownCount++;
+            empHits++;
+            t.spinVelocity.set((t.mesh.position.x - playerCar.position.x) * 8 + (random() - 0.5) * 12, 18, -25);
+          }
+        }
+        const pts = (1000 + empHits * 500) * combo;
+        score += pts;
+        triggerAlert(`EMP BLAST! +${pts}`, PALETTE.magenta);
+      } else {
+        speedSurgeTimer = Math.min(6.0, speedSurgeTimer + 2.5);
+        playerSpeed = Math.min(145, playerSpeed + 14);
+        boostEnergy = Math.min(100, boostEnergy + 20);
+        const pts = 350 * combo;
+        score += pts;
+        sound(660, 0.12, 'sine', 1320, 0.22);
+        triggerAlert(`+${pts} SPEED SURGE!`, PALETTE.yellow);
+      }
+
+      for (let k = 0; k < 16; k++) {
         spawnParticle(
           c.mesh.position.x, 0.8, c.mesh.position.z,
           (random() - 0.5) * 14, 4 + random() * 8, (random() - 0.5) * 14,
-          random() > 0.5 ? PALETTE.yellow : PALETTE.cyan,
+          POWERUP_COLORS[c.type] ?? PALETTE.yellow,
           0.45, 'spark'
         );
       }
@@ -1105,6 +1447,32 @@ function update(dt) {
       scene.remove(c.mesh);
       collectibles.splice(i, 1);
       spawnOrbCluster();
+    }
+  }
+
+  // Stunt Ramps update
+  for (let i = ramps.length - 1; i >= 0; i--) {
+    const r = ramps[i];
+    r.mesh.position.z += playerSpeed * dt;
+    r.mesh.position.x = r.lane + getRoadCurveX(r.mesh.position.z);
+    r.mesh.position.y = getRoadCurveY(r.mesh.position.z);
+
+    const rdx = Math.abs(playerCar.position.x - r.mesh.position.x);
+    const rdz = Math.abs(playerCar.position.z - r.mesh.position.z);
+
+    if (!isAirborne && rdx < 1.9 && rdz < 2.2) {
+      isAirborne = true;
+      airY = 0.2;
+      airVy = 16.5;
+      airRoll = 0;
+      sound(320, 0.25, 'sine', 960, 0.25);
+      triggerAlert('LAUNCH JUMP!', PALETTE.yellow);
+    }
+
+    if (r.mesh.position.z > 30) {
+      scene.remove(r.mesh);
+      ramps.splice(i, 1);
+      spawnRamp();
     }
   }
 
@@ -1163,14 +1531,14 @@ function update(dt) {
   }
 
   // Camera tracking with reactive lag & FOV warp during boost
-  const targetCamX = playerCar.position.x * 0.45;
-  const targetCamY = 2.7 + (isBoosting ? 0.2 : 0);
+  const targetCamX = playerCar.position.x * 0.5;
+  const targetCamY = 2.7 + currentCurveY + (isBoosting ? 0.2 : 0) + (isAirborne ? airY * 0.4 : 0);
   const targetCamZ = playerCar.position.z + 7.0 + (isBoosting ? 1.2 : 0);
 
   camera.position.x = THREE.MathUtils.damp(camera.position.x, targetCamX, 7, dt);
   camera.position.y = THREE.MathUtils.damp(camera.position.y, targetCamY, 6, dt);
   camera.position.z = THREE.MathUtils.damp(camera.position.z, targetCamZ, 8, dt);
-  camera.lookAt(playerCar.position.x * 0.65, 0.9, playerCar.position.z - 24);
+  camera.lookAt(playerCar.position.x * 0.65, 0.9 + currentCurveY + (isAirborne ? airY * 0.5 : 0), playerCar.position.z - 24);
 
   const targetFov = isBoosting ? 64 : 54;
   camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 6, dt);
@@ -1186,9 +1554,16 @@ function update(dt) {
 }
 
 function draw(dt) {
-  // Post-crash or menu screen rotation
   if (state === 'title' || state === 'over') {
     for (const bldg of buildings) bldg.position.z += dt * 8;
+  }
+  if (empBlastTimer > 0 && empBlastRing) {
+    empBlastTimer -= dt;
+    const progress = 1 - (empBlastTimer / 0.5);
+    const scale = 1 + progress * 24;
+    empBlastRing.scale.set(scale, scale, 1);
+    empBlastRing.material.opacity = (empBlastTimer / 0.5) * 0.9;
+    if (empBlastTimer <= 0) empBlastRing.visible = false;
   }
 }
 
@@ -1227,6 +1602,7 @@ function endRound(won, { title, detail } = {}) {
   $('stat-dist').textContent = `${Math.floor(distanceTraveled)} m`;
   $('stat-speed').textContent = `${maxSpeedReached} km/h`;
   $('stat-orbs').textContent = `${speedOrbsCollected}`;
+  $('stat-stunts').textContent = `${stuntsCount}`;
   $('stat-misses').textContent = `${nearMissCount}`;
   $('stat-takedowns').textContent = `${takedownCount}`;
 
@@ -1271,6 +1647,7 @@ function frame() {
       _stepClicks.clear();
       _accumulator -= STEP;
     }
+    if (state === 'playing') updateMusic();
   }
 
   if (state !== 'playing') {
