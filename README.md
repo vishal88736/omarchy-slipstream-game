@@ -47,6 +47,8 @@ Once installed, **Slipstream** appears directly in **Game Vibes** in your applic
 
 ## Unique Gameplay Mechanics
 
+- **Speed Orbs & Velocity Surges**:
+  Collect glowing golden Speed Orbs floating along the highway lanes between traffic. Each orb gives an immediate instant acceleration surge (+25 km/h), extends the **Speed Surge** buff, recharges +20% Kinetic Boost energy, and awards +350 bonus points multiplied by your combo!
 - **Aerodynamic Slipstream Drafting**:
   Tuck in right behind opponent vehicles within their drafting cone. You'll hear the aerodynamic whistle, pick up an immediate velocity surge, and recharge your **Kinetic Boost** gauge.
 - **Near Miss Combos**:

@@ -52,6 +52,7 @@
       <span id="speed-display">0</span>
       <span id="speed-unit">KM/H</span>
     </div>
+    <div id="surge-badge" style="display:none; color:var(--yellow); font-size:11px; font-weight:800; letter-spacing:1.5px; margin-top:2px;">▲ SPEED SURGE ACTIVE</div>
     <div id="boost-container">
       <div id="boost-bar"></div>
     </div>
@@ -94,6 +95,7 @@
   <div class="stat-grid">
     <div class="stat-card"><div class="label">Distance</div><div class="val" id="stat-dist">0 m</div></div>
     <div class="stat-card"><div class="label">Top Speed</div><div class="val" id="stat-speed">0 km/h</div></div>
+    <div class="stat-card"><div class="label">Speed Orbs</div><div class="val" id="stat-orbs">0</div></div>
     <div class="stat-card"><div class="label">Near Misses</div><div class="val" id="stat-misses">0</div></div>
     <div class="stat-card"><div class="label">Takedowns</div><div class="val" id="stat-takedowns">0</div></div>
   </div>
@@ -114,8 +116,9 @@
     <tr><td class="key">?</td><td>This manual</td></tr>
   </table>
   <div style="text-align: left; background: color-mix(in srgb, var(--foreground) 8%, transparent); padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; margin-top: 10px;">
+    <b style="color:var(--yellow)">SPEED ORBS:</b> Collect glowing energy orbs along the lanes for instant speed surges, boost energy, and bonus score!<br>
     <b style="color:var(--cyan)">SLIPSTREAM DRAFT:</b> Sit tight behind rival cars to catch their air draft, gain speed, and recharge your boost gauge rapidly!<br>
-    <b style="color:var(--yellow)">NEAR MISS:</b> Skim close past traffic at high speed to build huge combo multipliers.<br>
+    <b style="color:var(--orange)">NEAR MISS:</b> Skim close past traffic at high speed to build huge combo multipliers.<br>
     <b style="color:var(--magenta)">OVERDRIVE TAKEDOWN:</b> While boosting, you are invincible. Ram opponents off the road for massive bonus points!
   </div>
   <p class="dim" style="margin-top:14px;">Press any key to close</p>
@@ -389,6 +392,50 @@ let bannerTimer = 0;
 // Reusable geometries & materials
 let materials = {};
 let geometries = {};
+
+let collectibles = [];
+let speedSurgeTimer = 0;
+let speedOrbsCollected = 0;
+
+// Speed orb shared geometries & materials
+const orbGeom = new THREE.OctahedronGeometry(0.55, 0);
+const ringGeom = new THREE.TorusGeometry(0.72, 0.06, 8, 16);
+const orbMat = new THREE.MeshStandardMaterial({
+  color: PALETTE.yellow,
+  emissive: PALETTE.yellow,
+  emissiveIntensity: 0.9,
+  roughness: 0.2,
+  metalness: 0.8,
+});
+const ringMat = new THREE.MeshBasicMaterial({ color: PALETTE.cyan });
+const orbShadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.35 });
+const orbShadowGeom = new THREE.PlaneGeometry(1.2, 1.2);
+
+function createOrbMesh() {
+  const group = new THREE.Group();
+  const core = new THREE.Mesh(orbGeom, orbMat);
+  core.castShadow = true;
+  const ring = new THREE.Mesh(ringGeom, ringMat);
+  ring.rotation.x = Math.PI / 2;
+  const shadow = new THREE.Mesh(orbShadowGeom, orbShadowMat);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -0.78;
+  group.add(core, ring, shadow);
+  group.userData = { core, ring, shadow };
+  return group;
+}
+
+function spawnOrbCluster(zOffset = null) {
+  const lane = LANES[Math.floor(random() * LANES.length)];
+  const count = 1 + Math.floor(random() * 4);
+  const baseZ = zOffset ?? (-160 - random() * 40);
+  for (let i = 0; i < count; i++) {
+    const mesh = createOrbMesh();
+    mesh.position.set(lane, 0.85, baseZ - i * 7.5);
+    scene.add(mesh);
+    collectibles.push({ mesh, lane, baseZ: mesh.position.z, collected: false });
+  }
+}
 
 function createCarMesh({ color = PALETTE.accent, isPlayer = false, type = 'sport' } = {}) {
   const group = new THREE.Group();
@@ -705,6 +752,12 @@ function reset() {
   for (const t of traffic) scene.remove(t.mesh);
   traffic = [];
 
+  // Clear collectibles
+  for (const c of collectibles) scene.remove(c.mesh);
+  collectibles = [];
+  speedSurgeTimer = 0;
+  speedOrbsCollected = 0;
+
   playerSpeed = 65;
   targetSpeed = 65;
   playerX = 0;
@@ -728,9 +781,12 @@ function reset() {
   playerCar.position.set(0, 0, 0);
   playerCar.rotation.set(0, 0, 0);
 
-  // Initial wave of traffic
+  // Initial wave of traffic & speed orbs
   for (let i = 0; i < 8; i++) {
     spawnTrafficVehicle(-40 - i * 32);
+  }
+  for (let i = 0; i < 4; i++) {
+    spawnOrbCluster(-35 - i * 42);
   }
 
   $('combo-badge').classList.remove('show');
@@ -811,10 +867,15 @@ function update(dt) {
     boostBurst = 0;
   }
 
+  // Speed surge timer
+  if (speedSurgeTimer > 0) speedSurgeTimer = Math.max(0, speedSurgeTimer - dt);
+  $('surge-badge').style.display = speedSurgeTimer > 0 ? 'block' : 'none';
+
   // Target speed dynamics
   const baseCruise = 65 + (sector - 1) * 8;
   const maxThrottle = isBoosting ? 135 : (baseCruise + (gasInput ? 35 : 0) - (brakeInput ? 30 : 0));
-  targetSpeed = maxThrottle + (isDrafting ? 20 : 0);
+  const surgeBoost = speedSurgeTimer > 0 ? 25 : 0;
+  targetSpeed = maxThrottle + (isDrafting ? 20 : 0) + surgeBoost;
   playerSpeed = THREE.MathUtils.damp(playerSpeed, targetSpeed, isBoosting ? 4 : 2.5, dt);
 
   const kmh = Math.round(playerSpeed * 2.2);
@@ -1002,6 +1063,51 @@ function update(dt) {
 
   isDrafting = currentDrafting;
 
+  // Collectibles (Speed Orbs / Points) update
+  for (let i = collectibles.length - 1; i >= 0; i--) {
+    const c = collectibles[i];
+    c.mesh.position.z += playerSpeed * dt;
+    c.mesh.userData.core.rotation.y += dt * 3.5;
+    c.mesh.userData.core.rotation.x += dt * 2.0;
+    c.mesh.userData.ring.rotation.z += dt * 4.0;
+    c.mesh.position.y = 0.85 + Math.sin(distanceTraveled * 0.15 + c.baseZ) * 0.15;
+
+    const dx = Math.abs(playerCar.position.x - c.mesh.position.x);
+    const dz = Math.abs(playerCar.position.z - c.mesh.position.z);
+
+    if (!c.collected && dx < 1.7 && dz < 1.8) {
+      c.collected = true;
+      speedOrbsCollected++;
+      speedSurgeTimer = Math.min(6.0, speedSurgeTimer + 2.5);
+      playerSpeed = Math.min(145, playerSpeed + 14);
+      boostEnergy = Math.min(100, boostEnergy + 20);
+      const pts = 350 * combo;
+      score += pts;
+      sound(660, 0.12, 'sine', 1320, 0.22);
+      triggerAlert(`+${pts} SPEED SURGE!`, PALETTE.yellow);
+
+      for (let k = 0; k < 14; k++) {
+        spawnParticle(
+          c.mesh.position.x, 0.8, c.mesh.position.z,
+          (random() - 0.5) * 14, 4 + random() * 8, (random() - 0.5) * 14,
+          random() > 0.5 ? PALETTE.yellow : PALETTE.cyan,
+          0.45, 'spark'
+        );
+      }
+
+      scene.remove(c.mesh);
+      collectibles.splice(i, 1);
+      spawnOrbCluster();
+      continue;
+    }
+
+    if (c.mesh.position.z > 30) {
+      scene.remove(c.mesh);
+      collectibles.splice(i, 1);
+      spawnOrbCluster();
+    }
+  }
+
   // Update visual draft ribbons
   for (let i = 0; i < draftLines.length; i++) {
     const line = draftLines[i];
@@ -1120,6 +1226,7 @@ function endRound(won, { title, detail } = {}) {
 
   $('stat-dist').textContent = `${Math.floor(distanceTraveled)} m`;
   $('stat-speed').textContent = `${maxSpeedReached} km/h`;
+  $('stat-orbs').textContent = `${speedOrbsCollected}`;
   $('stat-misses').textContent = `${nearMissCount}`;
   $('stat-takedowns').textContent = `${takedownCount}`;
 
